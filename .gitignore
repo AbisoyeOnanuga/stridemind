@@ -54,3 +54,5 @@ ios/Flutter/Flutter.framework
 lib/strava_config.dart
 .env
 config/dart_defines.local.json
+.cursor/
+.metadata
