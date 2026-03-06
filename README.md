@@ -14,6 +14,7 @@
 
 - Android: primary tested target in this template.
 - iOS: scaffold included; additional Apple signing/provisioning and testing are required before release.
+- Web: scaffold included; additional web testing/hosting setup is required before release.
 
 ## 📱 Getting Started
 
