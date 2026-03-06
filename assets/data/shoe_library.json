@@ -1,0 +1,52 @@
+{
+  "brands": [
+    {
+      "name": "Nike",
+      "models": ["Pegasus 40", "Pegasus 41", "Vaporfly Next% 2", "Vaporfly Next% 3", "Alphafly 2", "Alphafly 3", "Invincible 3", "Structure 25", "Zoom Fly 5", "Terra Kiger", "Wildhorse"]
+    },
+    {
+      "name": "Adidas",
+      "models": ["Adios 8", "Adios Pro 3", "Boston 12", "Prime X 2", "Tempo Next%", "Supernova", "Solarglide", "Takumi Sen"]
+    },
+    {
+      "name": "New Balance",
+      "models": ["FuelCell SuperComp Elite", "FuelCell Rebel", "Fresh Foam 1080", "Fresh Foam 880", "Hierro", "More v4", "SC Elite v4"]
+    },
+    {
+      "name": "Brooks",
+      "models": ["Ghost", "Glycerin", "Adrenaline GTS", "Hyperion", "Hyperion Tempo", "Launch", "Levitate", "Caldera"]
+    },
+    {
+      "name": "Saucony",
+      "models": ["Endorphin Pro 3", "Endorphin Speed 3", "Endorphin Elite", "Triumph", "Ride", "Kinvara", "Peregrine", "Xodus"]
+    },
+    {
+      "name": "Hoka",
+      "models": ["Clifton", "Bondi", "Mach 5", "Rincon", "Carbon X", "Speedgoat", "Challenger", "Arahi", "Gaviota"]
+    },
+    {
+      "name": "ASICS",
+      "models": ["Gel-Kayano 30", "Gel-Nimbus 25", "Metaspeed Sky+", "Metaspeed Edge+", "Gel-Cumulus", "Gel-Excite", "Trabuco", "Novablast"]
+    },
+    {
+      "name": "On",
+      "models": ["Cloudmonster", "Cloudflow", "Cloudrunner", "Cloudsurfer", "Cloudflyer", "Cloudvista", "Cloudnova"]
+    },
+    {
+      "name": "Puma",
+      "models": ["Deviate Nitro 2", "Velocity Nitro 2", "Magnify Nitro", "ForeverRun Nitro", "Liberate Nitro"]
+    },
+    {
+      "name": "Mizuno",
+      "models": ["Wave Rider", "Wave Sky", "Wave Inspire", "Wave Rebellion", "Wave Horizon", "Daichi"]
+    },
+    {
+      "name": "Altra",
+      "models": ["Escalante", "Paradigm", "Torin", "Olympus", "Lone Peak", "Rivera", "Via Olympus"]
+    },
+    {
+      "name": "Other",
+      "models": []
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      match /conversation_history/{docId} {
+        allow read, write: if isOwner(uid);
+      }
+
+      match /plans/{planType} {
+        allow read, write: if isOwner(uid)
+          && (planType == "training" || planType == "nutrition");
+      }
+    }
+  }
+}

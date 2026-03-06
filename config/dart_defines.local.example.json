@@ -1,0 +1,10 @@
+{
+  "ENABLE_FIREBASE": "false",
+  "STRAVA_CLIENT_ID": "",
+  "STRAVA_REDIRECT_URI": "stridemind://redirect",
+  "STRAVA_TOKEN_EXCHANGE_URL": "https://YOUR_BACKEND/strava/oauth/token",
+  "STRAVA_TOKEN_REFRESH_URL": "https://YOUR_BACKEND/strava/oauth/refresh",
+  "STRAVA_WEBHOOK_BASE_URL": "",
+  "GEMINI_API_KEY": "",
+  "ALLOW_INSECURE_DIRECT_STRAVA_OAUTH": "false"
+}
