@@ -1,6 +1,6 @@
 # StrideMind 🏃‍♂️
 
-**StrideMind** is a smart marathon training companion app built with Flutter. It integrates with Strava to deliver adaptive daily workout recommendations based on your training plan, recovery metrics, and fueling needs.
+**StrideMind** is a smart running and endurance training companion app built with Flutter. It integrates with Strava to deliver adaptive daily workout recommendations based on your training plan, recovery metrics, and fueling needs.
 
 ## 🚀 Features
 
