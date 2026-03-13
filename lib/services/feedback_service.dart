@@ -24,4 +24,22 @@ class FeedbackService {
       return "Error generating feedback: ${e.toString()}";
     }
   }
+
+  Stream<String> streamFeedback(String prompt) async* {
+    if (_geminiApiKey.isEmpty) {
+      yield "AI coach is not configured for this build. Set GEMINI_API_KEY with --dart-define.";
+      return;
+    }
+    try {
+      final content = [Content.text(prompt)];
+      await for (final response in _model.generateContentStream(content)) {
+        final chunk = response.text;
+        if (chunk != null && chunk.isNotEmpty) {
+          yield chunk;
+        }
+      }
+    } catch (e) {
+      yield "Error generating feedback: ${e.toString()}";
+    }
+  }
 }

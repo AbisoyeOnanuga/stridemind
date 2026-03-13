@@ -37,6 +37,7 @@ class _CoachPageState extends State<CoachPage> {
   List<dynamic>? _aiFeedback;
   List<Map<String, dynamic>>? _conversationHistory;
   bool _isLoading = false;
+  String _streamingFeedbackText = '';
   final _feedbackService = FeedbackService();
   final _promptService = PromptService();
   final _dbService = DatabaseService();
@@ -47,11 +48,11 @@ class _CoachPageState extends State<CoachPage> {
 
   final _trainingPlanService = TrainingPlanService();
   TrainingPlan? _activePlan;
-  bool _includeTrainingPlan = true;
+  bool _includeTrainingPlan = false;
 
   final _nutritionPlanService = NutritionPlanService();
   NutritionPlan? _activeNutritionPlan;
-  bool _includeNutritionPlan = true;
+  bool _includeNutritionPlan = false;
 
   @override
   void initState() {
@@ -182,6 +183,7 @@ class _CoachPageState extends State<CoachPage> {
     setState(() {
       _isLoading = true;
       _aiFeedback = null; // Clear previous feedback while loading
+      _streamingFeedbackText = '';
     });
 
     try {
@@ -220,7 +222,16 @@ class _CoachPageState extends State<CoachPage> {
         planHistorySummary: planHistorySummary.isNotEmpty ? planHistorySummary : null,
       );
 
-      final feedbackJsonString = await _feedbackService.getFeedback(prompt);
+      final feedbackBuffer = StringBuffer();
+      await for (final chunk in _feedbackService.streamFeedback(prompt)) {
+        feedbackBuffer.write(chunk);
+        if (mounted) {
+          setState(() {
+            _streamingFeedbackText = feedbackBuffer.toString();
+          });
+        }
+      }
+      final feedbackJsonString = feedbackBuffer.toString();
       // The AI might return the JSON string wrapped in markdown ```json ... ```, so we clean it.
       final cleanedJson =
           feedbackJsonString.replaceAll('```json', '').replaceAll('```', '').trim();
@@ -248,6 +259,7 @@ class _CoachPageState extends State<CoachPage> {
           _isLoading = false;
           _conversationHistory = updatedHistory;
           _aiFeedback = feedbackData['feedback'] as List<dynamic>?; // Set display
+          _streamingFeedbackText = '';
         });
       }
     } catch (e) {
@@ -259,6 +271,7 @@ class _CoachPageState extends State<CoachPage> {
             // Set display to an error message, but DO NOT save to history
             {'type': 'heading', 'content': {'title': 'Error', 'text': friendly}}
           ];
+          _streamingFeedbackText = '';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -282,7 +295,7 @@ class _CoachPageState extends State<CoachPage> {
       padding: const EdgeInsets.all(16.0),
       children: [
         _buildSectionCard(
-          title: 'Daily Log',
+          title: 'Training Log',
           icon: Icons.edit_note,
           child: TextField(
             controller: _noteController,
@@ -310,13 +323,27 @@ class _CoachPageState extends State<CoachPage> {
           ),
         ),
         const SizedBox(height: 24),
-        if (_isLoading)
-          const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
+        if (_isLoading) ...[
+          _buildSectionCard(
+            title: 'AI Coach Feedback (live)',
+            icon: Icons.chat_bubble_outline,
+            child: _streamingFeedbackText.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                : MarkdownBody(
+                    data: _streamingFeedbackText,
+                    styleSheet:
+                        MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                      p: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
           ),
+          const SizedBox(height: 24),
+        ],
         if (_aiFeedback != null)
           _buildSectionCard(
             title: 'AI Coach Feedback',
