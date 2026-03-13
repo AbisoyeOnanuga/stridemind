@@ -325,22 +325,34 @@ class _CoachPageState extends State<CoachPage> {
         const SizedBox(height: 24),
         if (_isLoading) ...[
           _buildSectionCard(
-            title: 'AI Coach Feedback (live)',
+            title: 'AI Coach Feedback',
             icon: Icons.chat_bubble_outline,
-            child: _streamingFeedbackText.isEmpty
-                ? const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16.0),
-                      child: CircularProgressIndicator(),
-                    ),
-                  )
-                : MarkdownBody(
-                    data: _streamingFeedbackText,
-                    styleSheet:
-                        MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
-                      p: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Chip(
+                  label: Text('Streaming...'),
+                  visualDensity: VisualDensity.compact,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const SizedBox(height: 8),
+                _streamingFeedbackText.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16.0),
+                          child: CircularProgressIndicator(),
+                        ),
+                      )
+                    : MarkdownBody(
+                        data: _streamingFeedbackText,
+                        styleSheet:
+                            MarkdownStyleSheet.fromTheme(Theme.of(context))
+                                .copyWith(
+                          p: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+              ],
+            ),
           ),
           const SizedBox(height: 24),
         ],
