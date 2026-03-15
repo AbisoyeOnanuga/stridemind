@@ -137,12 +137,12 @@ class _TrainingPlanPageState extends State<TrainingPlanPage> {
   }
 
   Future<void> _openPlanHistory() async {
-    final activeChanged = await Navigator.of(context).push<bool>(
+    await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (ctx) => _PlanHistoryPage(service: _service),
       ),
     );
-    if (activeChanged == true && mounted) {
+    if (mounted) {
       _loadActivePlan();
       _loadPlanCount();
     }
@@ -167,7 +167,10 @@ class _TrainingPlanPageState extends State<TrainingPlanPage> {
     );
     if (confirmed != true) return;
     await _service.deleteActivePlan();
-    if (mounted) setState(() => _activePlan = null);
+    if (mounted) {
+      await _loadActivePlan();
+      _loadPlanCount();
+    }
   }
 
   void _showError(String message) {
@@ -1339,6 +1342,7 @@ class _PlanHistoryPageState extends State<_PlanHistoryPage> {
   List<TrainingPlanEntry> _entries = [];
   bool _includeArchived = false;
   bool _loading = true;
+  int? _busyEntryId;
 
   @override
   void initState() {
@@ -1352,17 +1356,36 @@ class _PlanHistoryPageState extends State<_PlanHistoryPage> {
     List<TrainingPlanEntry> list = [];
     try {
       list = await widget.service.getAllPlans(includeArchived: _includeArchived);
-      if (list.isEmpty && mounted) {
-        final active = await widget.service.getActivePlan();
-        if (active != null && mounted) {
-          await widget.service.savePlan(active);
-          list = await widget.service.getAllPlans(includeArchived: _includeArchived);
-        }
-      }
     } catch (_) {
       list = [];
     } finally {
       if (mounted) setState(() { _entries = list; _loading = false; });
+    }
+  }
+
+  Future<void> _runEntryAction(
+    int entryId,
+    Future<void> Function() action, {
+    bool closeWithRefresh = false,
+  }) async {
+    if (_busyEntryId != null) return;
+    if (!mounted) return;
+    setState(() => _busyEntryId = entryId);
+    try {
+      await action();
+      if (!mounted) return;
+      if (closeWithRefresh) {
+        Navigator.of(context).pop(true);
+        return;
+      }
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update history: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busyEntryId = null);
     }
   }
 
@@ -1415,6 +1438,7 @@ class _PlanHistoryPageState extends State<_PlanHistoryPage> {
       );
     }
     final e = _entries[index - 1];
+    final isBusy = _busyEntryId == e.id;
     return ListTile(
       title: Text(e.plan.name),
       subtitle: Text(
@@ -1427,62 +1451,81 @@ class _PlanHistoryPageState extends State<_PlanHistoryPage> {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!e.isActive)
-            TextButton(
-              onPressed: () async {
-                await widget.service.setActivePlanById(e.id);
-                if (context.mounted) Navigator.of(context).pop(true);
-              },
-              child: const Text('Set active'),
-            ),
-          if (e.archived)
-            TextButton(
-              onPressed: () async {
-                await widget.service.unarchivePlan(e.id);
-                await _load();
-              },
-              child: const Text('Restore'),
+      trailing: isBusy
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
             )
-          else
-            TextButton(
-              onPressed: () async {
-                await widget.service.archivePlan(e.id);
-                await _load();
+          : PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert),
+              onSelected: (value) async {
+                switch (value) {
+                  case 'set_active':
+                    await _runEntryAction(
+                      e.id,
+                      () => widget.service.setActivePlanById(e.id),
+                      closeWithRefresh: true,
+                    );
+                    return;
+                  case 'archive':
+                    await _runEntryAction(
+                      e.id,
+                      () => widget.service.archivePlan(e.id),
+                    );
+                    return;
+                  case 'restore':
+                    await _runEntryAction(
+                      e.id,
+                      () => widget.service.unarchivePlan(e.id),
+                    );
+                    return;
+                  case 'delete':
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Delete plan?'),
+                        content: Text('Permanently remove "${e.plan.name}"?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, false),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(ctx, true),
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Delete'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true && mounted) {
+                      await _runEntryAction(
+                        e.id,
+                        () => widget.service.deletePlanById(e.id),
+                        closeWithRefresh: e.isActive,
+                      );
+                    }
+                    return;
+                }
               },
-              child: const Text('Archive'),
-            ),
-          TextButton(
-            onPressed: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: const Text('Delete plan?'),
-                  content: Text('Permanently remove "${e.plan.name}"?'),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-                    TextButton(
-                      onPressed: () => Navigator.pop(ctx, true),
-                      style: TextButton.styleFrom(foregroundColor: Colors.red),
-                      child: const Text('Delete'),
-                    ),
-                  ],
+              itemBuilder: (ctx) => [
+                if (!e.isActive && !e.archived)
+                  const PopupMenuItem<String>(
+                    value: 'set_active',
+                    child: Text('Set active'),
+                  ),
+                PopupMenuItem<String>(
+                  value: e.archived ? 'restore' : 'archive',
+                  child: Text(e.archived ? 'Restore' : 'Archive'),
                 ),
-              );
-              if (confirm == true) {
-                await widget.service.deletePlanById(e.id);
-                if (mounted) await _load();
-                if (!context.mounted) return;
-                if (e.isActive) Navigator.of(context).pop(true);
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
+                const PopupMenuDivider(),
+                const PopupMenuItem<String>(
+                  value: 'delete',
+                  child: Text('Delete'),
+                ),
+              ],
+            ),
     );
   }
 

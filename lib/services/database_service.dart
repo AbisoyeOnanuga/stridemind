@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:path/path.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:stridemind/models/nutrition_plan.dart';
 import 'package:stridemind/models/runner_profile.dart';
@@ -17,6 +18,20 @@ class DatabaseService {
 
   static Database? _database;
   final FirestoreService _firestoreService = FirestoreService();
+  static const String _prefSkipTrainingCloudRestore = 'skip_training_cloud_restore';
+  bool _trainingCloudRestoreAttempted = false;
+
+  Future<SharedPreferences> _prefs() => SharedPreferences.getInstance();
+
+  Future<void> _setSkipTrainingCloudRestore(bool value) async {
+    final prefs = await _prefs();
+    await prefs.setBool(_prefSkipTrainingCloudRestore, value);
+  }
+
+  Future<bool> _getSkipTrainingCloudRestore() async {
+    final prefs = await _prefs();
+    return prefs.getBool(_prefSkipTrainingCloudRestore) ?? false;
+  }
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -286,6 +301,7 @@ class DatabaseService {
       'is_active': 1,
       'archived': 0,
     });
+    await _setSkipTrainingCloudRestore(false);
     _firestoreService.savePlan('training', plan.name, plan.toJsonString());
   }
 
@@ -327,7 +343,14 @@ class DatabaseService {
         return null;
       }
     }
-    // SQLite empty — attempt a one-time restore from Firestore (new device / reinstall).
+    if (_trainingCloudRestoreAttempted) return null;
+    _trainingCloudRestoreAttempted = true;
+
+    // SQLite empty — attempt a one-time restore from Firestore (new device / reinstall),
+    // unless user explicitly deleted all local plans.
+    final skipRestore = await _getSkipTrainingCloudRestore();
+    if (skipRestore) return null;
+
     try {
       final remote = await _firestoreService.getPlan('training');
       if (remote != null && remote['plan_json'] != null) {
@@ -412,6 +435,7 @@ class DatabaseService {
     if (isActive) {
       final next = await db.query(
         'training_plan',
+        where: 'COALESCE(archived, 0) = 0',
         orderBy: 'created_at DESC',
         limit: 1,
       );
@@ -421,6 +445,27 @@ class DatabaseService {
           {'is_active': 1},
           where: 'id = ?',
           whereArgs: [next.first['id']],
+        );
+      }
+    }
+
+    final remaining = await db.query('training_plan', columns: ['id'], limit: 1);
+    if (remaining.isEmpty) {
+      await _setSkipTrainingCloudRestore(true);
+      await _firestoreService.deletePlan('training');
+    } else {
+      await _setSkipTrainingCloudRestore(false);
+      final active = await db.query(
+        'training_plan',
+        where: 'is_active = ?',
+        whereArgs: [1],
+        limit: 1,
+      );
+      if (active.isNotEmpty) {
+        await _firestoreService.savePlan(
+          'training',
+          active.first['name'] as String,
+          active.first['plan_json'] as String,
         );
       }
     }
@@ -435,6 +480,20 @@ class DatabaseService {
       where: 'id = ?',
       whereArgs: [id],
     );
+    final active = await db.query(
+      'training_plan',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (active.isNotEmpty) {
+      await _setSkipTrainingCloudRestore(false);
+      await _firestoreService.savePlan(
+        'training',
+        active.first['name'] as String,
+        active.first['plan_json'] as String,
+      );
+    }
   }
 
   Future<void> clearActiveTrainingPlan() async {

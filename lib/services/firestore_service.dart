@@ -89,6 +89,20 @@ class FirestoreService {
     }
   }
 
+  /// Deletes a synced plan document from Firestore.
+  /// [type] must be "training" or "nutrition".
+  Future<void> deletePlan(String type) async {
+    final db = _db;
+    if (db == null) return;
+    final uid = _authService.uid;
+    if (uid == null) return;
+    try {
+      await db.collection('users').doc(uid).collection('plans').doc(type).delete();
+    } catch (e) {
+      debugPrint("FirestoreService: Error deleting $type plan: $e");
+    }
+  }
+
   // ---------------------------------------------------------------------------
 
   /// Saves the user's Strava ID and other profile info to their user document.
