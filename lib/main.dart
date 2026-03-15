@@ -139,8 +139,8 @@ class _StrideMindAppState extends State<StrideMindApp> {
   }
 
   void _onThemeModeChanged(ThemeMode mode) {
+    // ThemeService updates notifier immediately and persists asynchronously.
     _themeService.setThemeMode(mode);
-    if (mounted) setState(() => _themeMode = mode);
   }
 
   ThemeData _resolvedTheme(BuildContext context) {

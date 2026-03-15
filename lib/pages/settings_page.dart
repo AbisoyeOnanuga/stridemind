@@ -58,15 +58,21 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _showThemePicker(BuildContext context, ThemeData theme) async {
-    final current = await _themeService.getThemeMode();
+    final current =
+        ThemeService.themeModeNotifier.value ?? await _themeService.getThemeMode();
     if (!context.mounted) return;
     final chosen = await showDialog<ThemeMode>(
       context: context,
       builder: (ctx) => _ThemePickerDialog(current: current),
     );
     if (chosen != null) {
-      await _themeService.setThemeMode(chosen);
-      widget.onThemeModeChanged?.call(chosen);
+      // Persist/apply once via app-level callback when available.
+      // Fallback to direct service call for contexts without callback.
+      if (widget.onThemeModeChanged != null) {
+        widget.onThemeModeChanged!(chosen);
+      } else {
+        _themeService.setThemeMode(chosen);
+      }
     }
   }
 

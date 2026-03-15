@@ -12,9 +12,14 @@ class ThemeService {
 
   /// Notifier updated by [setThemeMode]. Main app listens to apply theme even when Settings callback was null.
   static final ValueNotifier<ThemeMode?> themeModeNotifier = ValueNotifier<ThemeMode?>(null);
+  static SharedPreferences? _cachedPrefs;
+
+  Future<SharedPreferences> _prefs() async {
+    return _cachedPrefs ??= await SharedPreferences.getInstance();
+  }
 
   Future<ThemeMode> getThemeMode() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _prefs();
     final value = prefs.getString(_keyThemeMode) ?? valueSystem;
     switch (value) {
       case valueLight:
@@ -27,13 +32,15 @@ class ThemeService {
   }
 
   Future<void> setThemeMode(ThemeMode mode) async {
-    final prefs = await SharedPreferences.getInstance();
+    // Apply immediately for snappy UI; persist in background.
+    themeModeNotifier.value = mode;
+
+    final prefs = await _prefs();
     final value = mode == ThemeMode.light
         ? valueLight
         : mode == ThemeMode.dark
             ? valueDark
             : valueSystem;
     await prefs.setString(_keyThemeMode, value);
-    themeModeNotifier.value = mode;
   }
 }
