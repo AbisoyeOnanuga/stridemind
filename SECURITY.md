@@ -1,5 +1,14 @@
 # Security Checklist (Pre-Release)
 
+## Security Posture (Pre-Publish Sanity Check)
+
+- **Secrets not in repo:** All secrets (Strava client secret, Gemini API key, tokens, backend URLs) are supplied at build/run via `--dart-define` or from gitignored files (`.env`, `config/dart_defines.local.json`). The committed `lib/strava_config.dart` and similar files only use `String.fromEnvironment(..., defaultValue: '')` — no literal keys.
+- **Public repo:** Firebase/Strava/Gemini config use placeholders or empty defaults; clone-and-build does not touch your infrastructure. `ENABLE_FIREBASE=false` by default.
+- **No backdoors:** No hardcoded credentials, no hidden endpoints; optional features (e.g. webhook) only activate when the user supplies a base URL.
+- **Defence in depth:** Firestore rules, API key restrictions (when you use your own project), and backend token exchange for production are documented and recommended.
+
+Software cannot be fully secure; the measures above aim to block common threats (secret leakage, accidental use of your keys by others, unauthorised access) without introducing backdoors or unintended external access.
+
 ## Critical
 
 - Do not ship app builds that contain `STRAVA_CLIENT_SECRET`.
