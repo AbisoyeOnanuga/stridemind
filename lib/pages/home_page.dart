@@ -210,12 +210,15 @@ class ActivityDashboard extends StatefulWidget {
 
 class _ActivityDashboardState extends State<ActivityDashboard>
     with WidgetsBindingObserver {
+  static const String _connectSourcePrompt =
+      'Connect Strava or Samsung Health in Settings to see activities.';
   final _db = DatabaseService();
 
   List<StravaActivity> _activities = [];
   bool _isFirstLoad = true;  // true until cache or fresh data is displayed
   bool _isRefreshing = false; // true during a background delta sync
   String? _error;
+  bool _connectRecoveryScheduled = false;
 
   bool _isNetworkError(String text) {
     final lower = text.toLowerCase();
@@ -255,7 +258,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      _syncFromStrava(silent: true);
+      _loadData();
     }
   }
 
@@ -266,7 +269,17 @@ class _ActivityDashboardState extends State<ActivityDashboard>
 
   Future<String?> _getActiveSource() async {
     final sourceService = ActivitySourceService();
-    final stravaConnected = await widget.authService.getValidAccessToken() != null;
+    final savedSource = await sourceService.getActiveSource();
+    final hasStoredToken = await widget.authService.isLoggedIn();
+    final hasValidToken = await widget.authService.getValidAccessToken() != null;
+    final stravaConnected = hasStoredToken || hasValidToken;
+
+    // Keep source state stable after reconnects so Home doesn't show a stale connect prompt.
+    if (savedSource == null && stravaConnected) {
+      await sourceService.setActiveSource(ActivitySourceService.valueStrava);
+      return ActivitySourceService.valueStrava;
+    }
+
     return sourceService.getEffectiveActiveSource(stravaConnected: stravaConnected);
   }
 
@@ -304,12 +317,33 @@ class _ActivityDashboardState extends State<ActivityDashboard>
     } else if (source == ActivitySourceService.valueSamsungHealth) {
       await _syncFromSamsungHealth(silent: cached.isNotEmpty);
     } else {
+      // OAuth redirect can finish milliseconds after first Home load.
+      // Retry source detection once before showing connect prompt.
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      final retrySource = await _getActiveSource();
+      if (retrySource == ActivitySourceService.valueStrava) {
+        await _syncFromStrava(silent: cached.isNotEmpty);
+        return;
+      }
+      if (retrySource == ActivitySourceService.valueSamsungHealth) {
+        await _syncFromSamsungHealth(silent: cached.isNotEmpty);
+        return;
+      }
+
+      final hasStoredToken = await widget.authService.isLoggedIn();
+      final hasValidToken = await widget.authService.getValidAccessToken() != null;
+      if (hasStoredToken || hasValidToken) {
+        // Fallback for stale source prefs: recover to Strava when a token exists.
+        await ActivitySourceService().setActiveSource(ActivitySourceService.valueStrava);
+        await _syncFromStrava(silent: cached.isNotEmpty);
+        return;
+      }
       if (mounted) {
         setState(() {
           _activities = cached;
           _isFirstLoad = false;
           _isRefreshing = false;
-          _error = 'Connect Strava or Samsung Health in Settings to see activities.';
+          _error = _connectSourcePrompt;
         });
       }
     }
@@ -326,6 +360,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
         _activities = all;
         _isFirstLoad = false;
         _isRefreshing = false;
+        _error = null;
       });
     }
   }
@@ -342,9 +377,26 @@ class _ActivityDashboardState extends State<ActivityDashboard>
     }
     if (mounted) {
       setState(() {
-        _error = 'Connect Strava or Samsung Health in Settings to see activities.';
+        _error = _connectSourcePrompt;
       });
     }
+  }
+
+  void _scheduleConnectPromptRecovery() {
+    if (_connectRecoveryScheduled) return;
+    _connectRecoveryScheduled = true;
+    Future<void>(() async {
+      try {
+        final hasStoredToken = await widget.authService.isLoggedIn();
+        final hasValidToken = await widget.authService.getValidAccessToken() != null;
+        if (hasStoredToken || hasValidToken) {
+          await ActivitySourceService().setActiveSource(ActivitySourceService.valueStrava);
+          await _syncFromStrava(silent: _activities.isNotEmpty);
+        }
+      } finally {
+        _connectRecoveryScheduled = false;
+      }
+    });
   }
 
   /// Syncs new activities from Strava.
@@ -469,6 +521,9 @@ class _ActivityDashboardState extends State<ActivityDashboard>
     }
 
     if (_error != null && _activities.isEmpty) {
+      if (_error == _connectSourcePrompt) {
+        _scheduleConnectPromptRecovery();
+      }
       // Signed in with Google (or other) but no Strava: prompt to connect in Settings.
       final hasFirebaseUser = FirebaseAuthService().currentUser != null;
       return Padding(
@@ -483,13 +538,13 @@ class _ActivityDashboardState extends State<ActivityDashboard>
             ),
             const SizedBox(height: 16),
             Text(
-              hasFirebaseUser && (_error == null || !_isNetworkError(_error!))
-                  ? 'Connect Strava or Samsung Health in Settings to see activities'
+              _error == _connectSourcePrompt
+                  ? _connectSourcePrompt
                   : (_error ?? 'Could not load activities'),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleMedium,
             ),
-            if (hasFirebaseUser) ...[
+            if (hasFirebaseUser && _error == _connectSourcePrompt) ...[
               const SizedBox(height: 8),
               Text(
                 'Go to Settings to connect Strava and sync workouts.',
@@ -515,7 +570,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
               const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: _refreshCurrentSource,
-                child: const Text('Retry'),
+                child: Text(_error == _connectSourcePrompt ? 'Retry' : 'Refresh'),
               ),
             ],
           ],

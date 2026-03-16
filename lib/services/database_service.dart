@@ -8,6 +8,7 @@ import 'package:stridemind/models/gear.dart';
 import 'package:stridemind/models/strava_activity.dart';
 import 'package:stridemind/models/strava_athlete.dart';
 import 'package:stridemind/models/training_plan.dart';
+import 'package:stridemind/services/activity_source_service.dart';
 import 'package:stridemind/services/firestore_service.dart';
 import 'package:stridemind/utils/training_plan_storage_config.dart';
 
@@ -81,6 +82,14 @@ class DatabaseService {
       } catch (_) {
         // Best-effort self-heal for legacy local databases.
       }
+    }
+    try {
+      // Legacy rows can still have NULL/empty source values; treat them as Strava.
+      await db.execute(
+        "UPDATE strava_activities SET source = 'strava' WHERE source IS NULL OR TRIM(source) = ''",
+      );
+    } catch (_) {
+      // Best-effort cleanup only.
     }
   }
 
@@ -628,9 +637,14 @@ class DatabaseService {
   /// [source] if non-null returns only activities for that source ('strava' | 'samsung_health').
   Future<List<StravaActivity>> getCachedActivities({String? source}) async {
     final db = await database;
+    final where = source == null
+        ? null
+        : source == ActivitySourceService.valueStrava
+            ? "COALESCE(source, 'strava') = ?"
+            : 'source = ?';
     final rows = await db.query(
       'strava_activities',
-      where: source != null ? 'source = ?' : null,
+      where: where,
       whereArgs: source != null ? [source] : null,
       orderBy: 'start_date_epoch DESC',
     );
@@ -655,14 +669,19 @@ class DatabaseService {
   /// Returns the Unix epoch (seconds) of the most recently cached activity for [source], or null if empty.
   Future<int?> getLatestActivityEpoch({String? source}) async {
     final db = await database;
-    final result = source != null
+    final result = source == null
         ? await db.rawQuery(
-            'SELECT MAX(start_date_epoch) AS latest FROM strava_activities WHERE source = ?',
-            [source],
-          )
-        : await db.rawQuery(
             'SELECT MAX(start_date_epoch) AS latest FROM strava_activities',
-          );
+          )
+        : source == ActivitySourceService.valueStrava
+            ? await db.rawQuery(
+                "SELECT MAX(start_date_epoch) AS latest FROM strava_activities WHERE COALESCE(source, 'strava') = ?",
+                [source],
+              )
+            : await db.rawQuery(
+                'SELECT MAX(start_date_epoch) AS latest FROM strava_activities WHERE source = ?',
+                [source],
+              );
     return result.first['latest'] as int?;
   }
 
