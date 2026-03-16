@@ -48,7 +48,54 @@ class DatabaseService {
       version: 9,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
+      onOpen: _onOpen,
     );
+  }
+
+  Future<void> _onOpen(Database db) async {
+    await _ensureLegacySchemaColumns(db);
+  }
+
+  Future<void> _ensureLegacySchemaColumns(Database db) async {
+    if (!await _columnExists(db, 'gear', 'gear_type')) {
+      try {
+        await db.execute('ALTER TABLE gear ADD COLUMN gear_type TEXT');
+      } catch (_) {
+        // Best-effort self-heal for legacy local databases.
+      }
+    }
+    if (!await _columnExists(db, 'training_plan', 'archived')) {
+      try {
+        await db.execute(
+          'ALTER TABLE training_plan ADD COLUMN archived INTEGER NOT NULL DEFAULT 0',
+        );
+      } catch (_) {
+        // Best-effort self-heal for legacy local databases.
+      }
+    }
+    if (!await _columnExists(db, 'strava_activities', 'source')) {
+      try {
+        await db.execute(
+          "ALTER TABLE strava_activities ADD COLUMN source TEXT NOT NULL DEFAULT 'strava'",
+        );
+      } catch (_) {
+        // Best-effort self-heal for legacy local databases.
+      }
+    }
+  }
+
+  Future<bool> _columnExists(Database db, String table, String column) async {
+    try {
+      final rows = await db.rawQuery('PRAGMA table_info($table)');
+      for (final row in rows) {
+        if ((row['name']?.toString() ?? '') == column) {
+          return true;
+        }
+      }
+    } catch (_) {
+      // Table may not exist yet during certain edge flows.
+    }
+    return false;
   }
 
   Future<void> _onCreate(Database db, int version) async {
