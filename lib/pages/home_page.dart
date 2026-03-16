@@ -11,7 +11,6 @@ import 'package:stridemind/models/strava_athlete.dart';
 import 'package:stridemind/pages/nutrition_plan_page.dart';
 import 'package:stridemind/pages/training_plan_page.dart';
 import 'package:stridemind/services/activity_refresh_notifier.dart';
-import 'package:stridemind/services/activity_source_service.dart';
 import 'package:stridemind/services/database_service.dart';
 import 'package:stridemind/services/fcm_service.dart';
 import 'package:stridemind/services/strava_api_service.dart';
@@ -211,7 +210,7 @@ class ActivityDashboard extends StatefulWidget {
 class _ActivityDashboardState extends State<ActivityDashboard>
     with WidgetsBindingObserver {
   static const String _connectSourcePrompt =
-      'Connect Strava or Samsung Health in Settings to see activities.';
+      'Connect Strava in Settings to see activities.';
   final _db = DatabaseService();
 
   List<StravaActivity> _activities = [];
@@ -267,37 +266,18 @@ class _ActivityDashboardState extends State<ActivityDashboard>
     _reloadFromCache();
   }
 
-  Future<String?> _getActiveSource() async {
-    final sourceService = ActivitySourceService();
-    final savedSource = await sourceService.getActiveSource();
-    final hasStoredToken = await widget.authService.isLoggedIn();
-    final hasValidToken = await widget.authService.getValidAccessToken() != null;
-    final stravaConnected = hasStoredToken || hasValidToken;
-
-    // Keep source state stable after reconnects so Home doesn't show a stale connect prompt.
-    if (savedSource == null && stravaConnected) {
-      await sourceService.setActiveSource(ActivitySourceService.valueStrava);
-      return ActivitySourceService.valueStrava;
-    }
-
-    return sourceService.getEffectiveActiveSource(stravaConnected: stravaConnected);
-  }
-
   /// Reload activity list from SQLite (e.g. after FCM delivered a new activity).
   Future<void> _reloadFromCache() async {
-    final source = await _getActiveSource();
-    final all = source != null
-        ? await _db.getCachedActivities(source: source)
-        : <StravaActivity>[];
+    final all = await _db.getCachedActivities(source: 'strava');
     if (mounted) setState(() => _activities = all);
   }
 
   Future<void> _loadData() async {
-    final source = await _getActiveSource();
+    final hasStoredToken = await widget.authService.isLoggedIn();
+    final hasValidToken = await widget.authService.getValidAccessToken() != null;
+    final stravaConnected = hasStoredToken || hasValidToken;
     // Step 1: serve from SQLite cache for the active source (empty when no source set).
-    final cached = source != null
-        ? await _db.getCachedActivities(source: source)
-        : <StravaActivity>[]; // No active source: show connect prompt
+    final cached = await _db.getCachedActivities(source: 'strava');
     final cachedAthlete = await _db.getCachedAthleteProfile();
 
     if (cached.isNotEmpty && cachedAthlete != null) {
@@ -311,33 +291,10 @@ class _ActivityDashboardState extends State<ActivityDashboard>
       }
     }
 
-    // Step 2: background delta sync for the active source.
-    if (source == ActivitySourceService.valueStrava) {
+    // Step 2: background delta sync (Strava only).
+    if (stravaConnected) {
       await _syncFromStrava(silent: cached.isNotEmpty);
-    } else if (source == ActivitySourceService.valueSamsungHealth) {
-      await _syncFromSamsungHealth(silent: cached.isNotEmpty);
     } else {
-      // OAuth redirect can finish milliseconds after first Home load.
-      // Retry source detection once before showing connect prompt.
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      final retrySource = await _getActiveSource();
-      if (retrySource == ActivitySourceService.valueStrava) {
-        await _syncFromStrava(silent: cached.isNotEmpty);
-        return;
-      }
-      if (retrySource == ActivitySourceService.valueSamsungHealth) {
-        await _syncFromSamsungHealth(silent: cached.isNotEmpty);
-        return;
-      }
-
-      final hasStoredToken = await widget.authService.isLoggedIn();
-      final hasValidToken = await widget.authService.getValidAccessToken() != null;
-      if (hasStoredToken || hasValidToken) {
-        // Fallback for stale source prefs: recover to Strava when a token exists.
-        await ActivitySourceService().setActiveSource(ActivitySourceService.valueStrava);
-        await _syncFromStrava(silent: cached.isNotEmpty);
-        return;
-      }
       if (mounted) {
         setState(() {
           _activities = cached;
@@ -349,30 +306,11 @@ class _ActivityDashboardState extends State<ActivityDashboard>
     }
   }
 
-  Future<void> _syncFromSamsungHealth({bool silent = false}) async {
-    if (!silent && mounted) setState(() => _isFirstLoad = true);
-    if (silent && mounted) setState(() => _isRefreshing = true);
-    // Integrate Health Connect / Samsung Health and upsert activities with source 'samsung_health'.
-    final source = ActivitySourceService.valueSamsungHealth;
-    final all = await _db.getCachedActivities(source: source);
-    if (mounted) {
-      setState(() {
-        _activities = all;
-        _isFirstLoad = false;
-        _isRefreshing = false;
-        _error = null;
-      });
-    }
-  }
-
   Future<void> _refreshCurrentSource() async {
-    final source = await _getActiveSource();
-    if (source == ActivitySourceService.valueStrava) {
+    final hasStoredToken = await widget.authService.isLoggedIn();
+    final hasValidToken = await widget.authService.getValidAccessToken() != null;
+    if (hasStoredToken || hasValidToken) {
       await _syncFromStrava();
-      return;
-    }
-    if (source == ActivitySourceService.valueSamsungHealth) {
-      await _syncFromSamsungHealth();
       return;
     }
     if (mounted) {
@@ -390,7 +328,6 @@ class _ActivityDashboardState extends State<ActivityDashboard>
         final hasStoredToken = await widget.authService.isLoggedIn();
         final hasValidToken = await widget.authService.getValidAccessToken() != null;
         if (hasStoredToken || hasValidToken) {
-          await ActivitySourceService().setActiveSource(ActivitySourceService.valueStrava);
           await _syncFromStrava(silent: _activities.isNotEmpty);
         }
       } finally {
@@ -444,7 +381,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
       }
 
       // Delta fetch: only activities newer than the latest cached one for this source.
-      final latestEpoch = await _db.getLatestActivityEpoch(source: ActivitySourceService.valueStrava);
+      final latestEpoch = await _db.getLatestActivityEpoch(source: 'strava');
       final afterTimestamp = latestEpoch ??
           (DateTime.now()
                   .subtract(const Duration(days: 30))
@@ -461,7 +398,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
       }
 
       // Reload the full sorted list from SQLite for this source.
-      final all = await _db.getCachedActivities(source: ActivitySourceService.valueStrava);
+      final all = await _db.getCachedActivities(source: 'strava');
       if (mounted) {
         setState(() {
           _activities = all;
@@ -502,7 +439,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
         const maxPrefetch = 30;
         for (var i = 0; i < _activities.length && i < maxPrefetch; i++) {
           final a = _activities[i];
-          if (a.source != null && a.source != ActivitySourceService.valueStrava) continue;
+          if (a.source != null && a.source != 'strava') continue;
           if (a.splits != null && a.splits!.isNotEmpty) continue;
           try {
             final full = await api.getActivityDetails(a.id);

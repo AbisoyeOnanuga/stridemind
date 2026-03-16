@@ -41,7 +41,7 @@ class StravaActivity {
   final int? sufferScore;
   /// Strava gear id (e.g. shoes or bike) used for this activity. Used for coach context.
   final String? gearId;
-  /// Activity source: 'strava' | 'samsung_health'. Used for filtering when multiple sources exist.
+  /// Activity source (currently 'strava').
   final String? source;
 
   StravaActivity({

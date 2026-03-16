@@ -4,7 +4,6 @@ import 'package:stridemind/pages/profile_page.dart';
 import 'package:stridemind/services/firebase_auth_service.dart';
 import 'package:stridemind/services/strava_auth_service.dart';
 import 'package:stridemind/services/theme_service.dart';
-import 'package:stridemind/services/activity_source_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// App URLs for Settings.
@@ -28,17 +27,14 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   bool _stravaConnected = false;
-  String? _activeSource;
   String? _accountEmail;
   final ThemeService _themeService = ThemeService();
-  final ActivitySourceService _sourceService = ActivitySourceService();
   final FirebaseAuthService _firebaseAuth = FirebaseAuthService();
 
   @override
   void initState() {
     super.initState();
     _checkStravaConnection();
-    _loadActiveSource();
     _loadAccountEmail();
   }
 
@@ -50,11 +46,6 @@ class _SettingsPageState extends State<SettingsPage> {
         _accountEmail = email;
       });
     }
-  }
-
-  Future<void> _loadActiveSource() async {
-    final source = await _sourceService.getActiveSource();
-    if (mounted) setState(() => _activeSource = source);
   }
 
   Future<void> _showThemePicker(BuildContext context, ThemeData theme) async {
@@ -80,10 +71,6 @@ class _SettingsPageState extends State<SettingsPage> {
     final token = await widget.authService.getValidAccessToken();
     if (mounted) {
       setState(() => _stravaConnected = token != null);
-      if (token != null && _activeSource == null) {
-        await _sourceService.setActiveSource(ActivitySourceService.valueStrava);
-        setState(() => _activeSource = ActivitySourceService.valueStrava);
-      }
     }
   }
 
@@ -153,18 +140,6 @@ class _SettingsPageState extends State<SettingsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_stravaConnected)
-                  TextButton(
-                    onPressed: _activeSource == ActivitySourceService.valueStrava
-                        ? null
-                        : () async {
-                            await _sourceService.setActiveSource(ActivitySourceService.valueStrava);
-                            if (mounted) setState(() => _activeSource = ActivitySourceService.valueStrava);
-                          },
-                    child: Text(
-                      _activeSource == ActivitySourceService.valueStrava ? 'In use' : 'Use for activities',
-                    ),
-                  ),
-                if (_stravaConnected)
                   IconButton(
                     icon: const Icon(Icons.link_off),
                     tooltip: 'Disconnect',
@@ -196,36 +171,6 @@ class _SettingsPageState extends State<SettingsPage> {
                   )
                 else
                   const Icon(Icons.chevron_right),
-              ],
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.fitness_center),
-            title: const Text('Samsung Health'),
-            subtitle: const Text('Use Health Connect on Android for activities'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextButton(
-                  onPressed: _activeSource == ActivitySourceService.valueSamsungHealth
-                      ? null
-                      : () async {
-                          await _sourceService.setActiveSource(ActivitySourceService.valueSamsungHealth);
-                          if (!mounted) return;
-                          setState(() => _activeSource = ActivitySourceService.valueSamsungHealth);
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Samsung Health / Health Connect sync coming soon. Use Strava for now.',
-                              ),
-                            ),
-                          );
-                        },
-                  child: Text(
-                    _activeSource == ActivitySourceService.valueSamsungHealth ? 'In use' : 'Use for activities',
-                  ),
-                ),
               ],
             ),
           ),

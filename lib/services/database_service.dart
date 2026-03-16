@@ -8,7 +8,6 @@ import 'package:stridemind/models/gear.dart';
 import 'package:stridemind/models/strava_activity.dart';
 import 'package:stridemind/models/strava_athlete.dart';
 import 'package:stridemind/models/training_plan.dart';
-import 'package:stridemind/services/activity_source_service.dart';
 import 'package:stridemind/services/firestore_service.dart';
 import 'package:stridemind/utils/training_plan_storage_config.dart';
 
@@ -23,6 +22,13 @@ class DatabaseService {
   bool _trainingCloudRestoreAttempted = false;
 
   Future<SharedPreferences> _prefs() => SharedPreferences.getInstance();
+
+  int? _asInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
 
   Future<void> _setSkipTrainingCloudRestore(bool value) async {
     final prefs = await _prefs();
@@ -428,7 +434,8 @@ class DatabaseService {
       limit: 1,
     );
     if (rows.isEmpty) return;
-    final id = rows.first['id'] as int;
+    final id = _asInt(rows.first['id']);
+    if (id == null) return;
     await deleteTrainingPlanById(id);
   }
 
@@ -441,7 +448,7 @@ class DatabaseService {
         whereArgs: [id],
         columns: ['is_active'],
       );
-      final wasActive = row.isNotEmpty && (row.first['is_active'] as int) == 1;
+      final wasActive = row.isNotEmpty && _asInt(row.first['is_active']) == 1;
       await db.update(
         'training_plan',
         {'archived': 1},
@@ -486,7 +493,7 @@ class DatabaseService {
       whereArgs: [id],
       columns: ['is_active'],
     );
-    final isActive = wasActive.isNotEmpty && (wasActive.first['is_active'] as int) == 1;
+    final isActive = wasActive.isNotEmpty && _asInt(wasActive.first['is_active']) == 1;
     await db.delete('training_plan', where: 'id = ?', whereArgs: [id]);
     if (isActive) {
       final next = await db.query(
@@ -634,12 +641,12 @@ class DatabaseService {
     await batch.commit(noResult: true);
   }
 
-  /// [source] if non-null returns only activities for that source ('strava' | 'samsung_health').
+  /// [source] if non-null returns only activities for that source (currently 'strava').
   Future<List<StravaActivity>> getCachedActivities({String? source}) async {
     final db = await database;
     final where = source == null
         ? null
-        : source == ActivitySourceService.valueStrava
+        : source == 'strava'
             ? "COALESCE(source, 'strava') = ?"
             : 'source = ?';
     final rows = await db.query(
@@ -673,7 +680,7 @@ class DatabaseService {
         ? await db.rawQuery(
             'SELECT MAX(start_date_epoch) AS latest FROM strava_activities',
           )
-        : source == ActivitySourceService.valueStrava
+        : source == 'strava'
             ? await db.rawQuery(
                 "SELECT MAX(start_date_epoch) AS latest FROM strava_activities WHERE COALESCE(source, 'strava') = ?",
                 [source],
@@ -682,7 +689,7 @@ class DatabaseService {
                 'SELECT MAX(start_date_epoch) AS latest FROM strava_activities WHERE source = ?',
                 [source],
               );
-    return result.first['latest'] as int?;
+    return _asInt(result.first['latest']);
   }
 
   // ---------------------------------------------------------------------------
@@ -715,7 +722,7 @@ class DatabaseService {
     final rows = await db.query('athlete_profile',
         columns: ['cached_at'], where: 'id = 1');
     if (rows.isEmpty) return null;
-    return rows.first['cached_at'] as int?;
+    return _asInt(rows.first['cached_at']);
   }
 
   // ---------------------------------------------------------------------------
@@ -861,7 +868,7 @@ class DatabaseService {
 
   Gear _gearFromRow(Map<String, dynamic> r) {
     return Gear(
-      id: r['id'] as int?,
+      id: _asInt(r['id']),
       stravaGearId: r['strava_gear_id'] as String?,
       name: r['name'] as String,
       brand: r['brand'] as String?,
@@ -869,10 +876,10 @@ class DatabaseService {
       nickname: r['nickname'] as String?,
       notes: r['notes'] as String?,
       distanceKm: (r['distance_km'] as num).toDouble(),
-      notifyAtKm: r['notify_at_km'] as int?,
+      notifyAtKm: _asInt(r['notify_at_km']),
       source: r['source'] as String,
-      createdAt: r['created_at'] as int,
-      updatedAt: r['updated_at'] as int,
+      createdAt: _asInt(r['created_at']) ?? 0,
+      updatedAt: _asInt(r['updated_at']) ?? 0,
       gearType: r['gear_type'] as String?,
     );
   }
