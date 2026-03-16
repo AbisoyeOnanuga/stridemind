@@ -1,3 +1,4 @@
+# Runs on PRs and pushes to main. Analyze only; tests run when test/ exists.
 name: Flutter CI
 
 on:
@@ -24,5 +25,10 @@ jobs:
         run: flutter analyze
 
       - name: Flutter test
-        run: flutter test
+        run: |
+          if [ -d test ] && [ -n "$(find test -name '*.dart' -print -quit)" ]; then
+            flutter test
+          else
+            echo "No test directory or tests found; skipping."
+          fi
 

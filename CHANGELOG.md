@@ -16,4 +16,6 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Deleted training plan no longer reappears from cloud restore flow.
+- Dashboard empty after upgrade: SQLite/JSON sometimes return integers as `double`; safe int parsing added in activity and training-plan code paths so the app no longer crashes with "type 'double' is not a subtype of type 'int?'". Legacy DB schema gaps (e.g. `source`, `gear_type`, `archived`) are applied at runtime so older installs migrate without reinstall.
+- CI: test step no longer fails when the repo has no `test/` directory.
 
