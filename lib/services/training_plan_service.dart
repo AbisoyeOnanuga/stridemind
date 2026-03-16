@@ -8,6 +8,15 @@ import 'package:stridemind/services/database_service.dart';
 import 'package:stridemind/utils/plan_file_reader.dart';
 import 'package:stridemind/utils/training_plan_storage_config.dart';
 
+/// SQLite can return INTEGER columns as double; safely coerce to int?.
+int? _safeInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
 /// A training plan with DB row metadata (id, active, archived).
 class TrainingPlanEntry {
   const TrainingPlanEntry({
@@ -85,10 +94,12 @@ class TrainingPlanService {
       try {
         final planMap = jsonDecode(row['plan_json'] as String) as Map<String, dynamic>;
         final plan = _normalisePlan(TrainingPlan.fromJson(planMap));
+        final id = _safeInt(row['id']);
+        if (id == null) continue;
         list.add(TrainingPlanEntry(
-          id: row['id'] as int,
-          isActive: (row['is_active'] as int?) == 1,
-          archived: (row['archived'] as int?) == 1,
+          id: id,
+          isActive: _safeInt(row['is_active']) == 1,
+          archived: _safeInt(row['archived']) == 1,
           plan: plan,
         ));
       } catch (_) {}

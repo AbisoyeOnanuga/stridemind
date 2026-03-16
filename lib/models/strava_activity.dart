@@ -1,3 +1,14 @@
+/// Safely parses an optional int from JSON (handles int, double, or String from SQLite/API).
+int? _jsonInt(dynamic v) {
+  if (v == null) return null;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  if (v is String) return int.tryParse(v);
+  return null;
+}
+
+int _jsonIntReq(dynamic v, [int fallback = 0]) => _jsonInt(v) ?? fallback;
+
 class Split {
   final double distance; // in meters
   final int movingTime; // in seconds
@@ -12,7 +23,7 @@ class Split {
   factory Split.fromJson(Map<String, dynamic> json) {
     return Split(
       distance: (json['distance'] ?? 0.0).toDouble(),
-      movingTime: json['moving_time'] ?? 0,
+      movingTime: _jsonIntReq(json['moving_time']),
       averageSpeed: (json['average_speed'] ?? 0.0).toDouble(),
     );
   }
@@ -69,12 +80,12 @@ class StravaActivity {
         splitsJson?.map((s) => Split.fromJson(s)).toList();
 
     return StravaActivity(
-      id: json['id'],
+      id: _jsonIntReq(json['id']),
       name: json['name'] ?? 'Unnamed Activity',
       type: json['type'] ?? 'Unknown',
       distance: (json['distance'] ?? 0.0).toDouble(),
-      movingTime: json['moving_time'] ?? 0,
-      elapsedTime: json['elapsed_time'] ?? 0,
+      movingTime: _jsonIntReq(json['moving_time']),
+      elapsedTime: _jsonIntReq(json['elapsed_time']),
       totalElevationGain: (json['total_elevation_gain'] ?? 0.0).toDouble(),
       startDateLocal: DateTime.parse(json['start_date_local']),
       averageSpeed: (json['average_speed'] as num?)?.toDouble(),
@@ -83,7 +94,7 @@ class StravaActivity {
       averageCadence: (json['average_cadence'] as num?)?.toDouble(),
       splits: splits,
       description: json['description'] as String?,
-      sufferScore: json['suffer_score'] as int?,
+      sufferScore: _jsonInt(json['suffer_score']),
       gearId: json['gear_id'] as String?,
       source: json['source'] as String?,
     );
