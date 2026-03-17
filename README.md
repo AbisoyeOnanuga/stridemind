@@ -51,6 +51,7 @@ Important:
 - Use backend token exchange/refresh endpoints for Strava OAuth.
 - Set `ENABLE_FIREBASE=false` to run local-only mode without any Firebase project.
 - To enable Firebase, set `ENABLE_FIREBASE=true` and replace Firebase config files with your own project values.
+- For post-workout push notifications (Strava webhook → FCM), see `NOTIFICATIONS.md`.
 - For local prototype only, insecure direct exchange can be enabled with:
   `--dart-define=ALLOW_INSECURE_DIRECT_STRAVA_OAUTH=true`
   (never use for release).

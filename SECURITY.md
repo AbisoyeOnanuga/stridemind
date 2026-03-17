@@ -28,6 +28,13 @@ Pass config at build/run time via `--dart-define`:
 - `STRAVA_WEBHOOK_BASE_URL`
 - `GEMINI_API_KEY` (recommended to move behind backend for production)
 
+## Post-workout notifications (optional)
+
+If you enable `STRAVA_WEBHOOK_BASE_URL`, the app will register device FCM tokens with **your backend** so it can send a push after Strava activities.
+
+- Setup and backend contract live in `NOTIFICATIONS.md`.
+- Do not commit: Strava verify token, Firebase service account JSON, Strava client secret, or backend URLs.
+
 ## Strava OAuth
 
 - Production should use backend endpoints for token exchange/refresh.
