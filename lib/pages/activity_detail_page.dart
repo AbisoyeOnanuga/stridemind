@@ -87,6 +87,10 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
     final isRun = _activity.type.toLowerCase() == 'run';
     final hasLaps = _activity.laps != null && _activity.laps!.isNotEmpty;
     final segments = _activity.canonicalSegments;
+    final kmSplits = ActivityDisplayUtils.getKmSplits(_activity.splits ?? const []);
+    final derivedKmSplits = kmSplits.isNotEmpty
+        ? kmSplits
+        : ActivityDisplayUtils.deriveKmSplitsFromSegments(segments);
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -167,10 +171,10 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
             ]),
           ],
           // Splits for runs (per km); equivalent "Splits / laps" for other types (no loading spinner; data appears when ready)
-          if (_loadError != null && segments.isEmpty) ...[
+          if (_loadError != null && derivedKmSplits.isEmpty && (!hasLaps || segments.isEmpty)) ...[
             const SizedBox(height: 16),
             _Section(
-              title: hasLaps ? 'Laps / intervals' : (isRun ? 'Splits (per km)' : 'Splits / laps'),
+              title: isRun ? 'Splits (per km)' : 'Splits / laps',
               children: [
                 Text(
                   'Could not load split data.',
@@ -178,14 +182,31 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
                 ),
               ],
             ),
-          ] else if (segments.isNotEmpty) ...[
+          ] else if (isRun && derivedKmSplits.isNotEmpty) ...[
             const SizedBox(height: 16),
             _Section(
-              title: hasLaps ? 'Laps / intervals' : (isRun ? 'Splits (per km)' : 'Splits / laps'),
+              title: 'Splits (per km)',
               children: [
-                _SplitsTable(splits: segments),
+                _KmSplitsTable(splits: derivedKmSplits),
                 const SizedBox(height: 12),
-                _SplitStatsChips(splits: segments),
+                _SplitStatsChips(splits: derivedKmSplits),
+              ],
+            ),
+            if (hasLaps) ...[
+              const SizedBox(height: 16),
+              _Section(
+                title: 'Laps / intervals',
+                children: [
+                  _IntervalsTable(segments: segments),
+                ],
+              ),
+            ],
+          ] else if (!isRun && segments.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _Section(
+              title: hasLaps ? 'Splits / laps' : 'Splits',
+              children: [
+                _IntervalsTable(segments: segments),
               ],
             ),
           ],
@@ -362,6 +383,181 @@ class _SplitsTable extends StatelessWidget {
                         : ActivityDisplayUtils.formatPace(s.averageSpeed),
                     style: cellStyle,
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(ActivityDisplayUtils.formatDuration(s.movingTime), style: cellStyle),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _KmSplitsTable extends StatelessWidget {
+  final List<Split> splits;
+
+  const _KmSplitsTable({required this.splits});
+
+  @override
+  Widget build(BuildContext context) {
+    if (splits.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final headerStyle = theme.textTheme.titleSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: colorScheme.onSurface,
+    );
+    final cellStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurface,
+    );
+
+    final borderColor = colorScheme.outline;
+    final headerBg = colorScheme.surfaceContainerHigh;
+    final cellBg = colorScheme.surface;
+    return Container(
+      decoration: BoxDecoration(
+        color: cellBg,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(0.8),
+          1: FlexColumnWidth(1.2),
+          2: FlexColumnWidth(1.0),
+        },
+        border: TableBorder.symmetric(
+          inside: BorderSide(color: borderColor.withValues(alpha: 0.5)),
+          outside: BorderSide.none,
+        ),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: headerBg),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Km', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Pace', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Time', style: headerStyle),
+              ),
+            ],
+          ),
+          ...splits.asMap().entries.map((e) {
+            final i = e.key + 1;
+            final s = e.value;
+            return TableRow(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text('$i', style: cellStyle),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(ActivityDisplayUtils.formatPace(s.averageSpeed), style: cellStyle),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(ActivityDisplayUtils.formatDuration(s.movingTime), style: cellStyle),
+                ),
+              ],
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _IntervalsTable extends StatelessWidget {
+  final List<Split> segments;
+
+  const _IntervalsTable({required this.segments});
+
+  @override
+  Widget build(BuildContext context) {
+    if (segments.isEmpty) return const SizedBox.shrink();
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final headerStyle = theme.textTheme.titleSmall?.copyWith(
+      fontWeight: FontWeight.w600,
+      color: colorScheme.onSurface,
+    );
+    final cellStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurface,
+    );
+
+    final borderColor = colorScheme.outline;
+    final headerBg = colorScheme.surfaceContainerHigh;
+    final cellBg = colorScheme.surface;
+    return Container(
+      decoration: BoxDecoration(
+        color: cellBg,
+        border: Border.all(color: borderColor),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Table(
+        columnWidths: const {
+          0: FlexColumnWidth(0.8),
+          1: FlexColumnWidth(1.2),
+          2: FlexColumnWidth(1.0),
+          3: FlexColumnWidth(1.0),
+        },
+        border: TableBorder.symmetric(
+          inside: BorderSide(color: borderColor.withValues(alpha: 0.5)),
+          outside: BorderSide.none,
+        ),
+        children: [
+          TableRow(
+            decoration: BoxDecoration(color: headerBg),
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('#', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Distance', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Pace', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text('Time', style: headerStyle),
+              ),
+            ],
+          ),
+          ...segments.asMap().entries.map((e) {
+            final i = e.key + 1;
+            final s = e.value;
+            return TableRow(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text('$i', style: cellStyle),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(ActivityDisplayUtils.formatDistance(s.distance), style: cellStyle),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(ActivityDisplayUtils.formatPace(s.averageSpeed), style: cellStyle),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

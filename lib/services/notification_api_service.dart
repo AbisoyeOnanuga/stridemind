@@ -9,12 +9,18 @@ import 'package:stridemind/services/firebase_auth_service.dart';
 class NotificationApiService {
   static const String _baseUrl =
       String.fromEnvironment('STRAVA_WEBHOOK_BASE_URL', defaultValue: '');
+  static bool _didLogNotConfigured = false;
 
   final FirebaseAuthService _authService = FirebaseAuthService();
 
+  static bool get isConfigured => _baseUrl.isNotEmpty;
+
   Future<void> registerDevice(String fcmToken) async {
     if (_baseUrl.isEmpty) {
-      debugPrint('NotificationApiService: STRAVA_WEBHOOK_BASE_URL not configured.');
+      if (kDebugMode && !_didLogNotConfigured) {
+        _didLogNotConfigured = true;
+        debugPrint('NotificationApiService: STRAVA_WEBHOOK_BASE_URL not configured.');
+      }
       return;
     }
     final idToken = await _authService.getIdToken();

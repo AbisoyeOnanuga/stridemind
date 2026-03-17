@@ -40,6 +40,63 @@ class ActivityDisplayUtils {
     return splits.where((s) => (s.distance - 1000.0).abs() < 5.0).toList();
   }
 
+  /// Derive ~1km splits from arbitrary segments (e.g. Strava laps/intervals).
+  ///
+  /// This is a best-effort fallback when Strava `splits_metric` isn't available.
+  /// It assumes each segment has distance (m) and moving time (s), and allocates
+  /// time proportionally when a segment crosses a km boundary.
+  static List<Split> deriveKmSplitsFromSegments(List<Split> segments) {
+    if (segments.isEmpty) return [];
+
+    const targetMeters = 1000.0;
+    final out = <Split>[];
+
+    double carriedMeters = 0.0;
+    double carriedSeconds = 0.0;
+
+    for (final seg in segments) {
+      final segMeters = seg.distance;
+      final segSeconds = seg.movingTime.toDouble();
+      if (segMeters <= 0 || segSeconds <= 0) continue;
+
+      double remainingMeters = segMeters;
+      double remainingSeconds = segSeconds;
+
+      while (remainingMeters > 0) {
+        final needMeters = targetMeters - carriedMeters;
+        if (needMeters <= 0) {
+          final t = carriedSeconds.round().clamp(1, 24 * 60 * 60);
+          out.add(Split(distance: targetMeters, movingTime: t, averageSpeed: targetMeters / t));
+          carriedMeters = 0.0;
+          carriedSeconds = 0.0;
+          continue;
+        }
+
+        if (remainingMeters >= needMeters) {
+          final fraction = needMeters / remainingMeters;
+          final takeSeconds = remainingSeconds * fraction;
+          carriedMeters += needMeters;
+          carriedSeconds += takeSeconds;
+
+          remainingMeters -= needMeters;
+          remainingSeconds -= takeSeconds;
+
+          final t = carriedSeconds.round().clamp(1, 24 * 60 * 60);
+          out.add(Split(distance: targetMeters, movingTime: t, averageSpeed: targetMeters / t));
+          carriedMeters = 0.0;
+          carriedSeconds = 0.0;
+        } else {
+          carriedMeters += remainingMeters;
+          carriedSeconds += remainingSeconds;
+          remainingMeters = 0;
+          remainingSeconds = 0;
+        }
+      }
+    }
+
+    return out;
+  }
+
   /// Returns compact splits text: one line of CSV plus a pacing stats line
   /// (same format as coach prompt). Returns empty string if splits empty.
   static String formatSplitsCompact(List<Split> splits) {

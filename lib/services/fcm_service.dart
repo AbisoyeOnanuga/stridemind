@@ -114,4 +114,17 @@ class FcmService {
       await _notificationApiService.registerDevice(token);
     }
   }
+
+  /// Manual retry (e.g. Settings) so backend has the FCM token for push.
+  /// Returns true if registered, false if failed, null if no token or URL not configured / Firebase disabled.
+  Future<bool?> retryDeviceRegistration() async {
+    final firebaseMessaging = _firebaseMessaging;
+    if (firebaseMessaging == null) return null;
+    final token = await firebaseMessaging.getToken();
+    if (token == null) return null;
+
+    // Public repo NotificationApiService returns void; treat "attempted" as true.
+    await _notificationApiService.registerDevice(token);
+    return true;
+  }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:material_design_icons_flutter/material_design_icons_flutter.dart';
 import 'package:stridemind/pages/profile_page.dart';
 import 'package:stridemind/services/firebase_auth_service.dart';
+import 'package:stridemind/services/fcm_service.dart';
+import 'package:stridemind/services/notification_api_service.dart';
 import 'package:stridemind/services/strava_auth_service.dart';
 import 'package:stridemind/services/theme_service.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -173,6 +175,45 @@ class _SettingsPageState extends State<SettingsPage> {
                   const Icon(Icons.chevron_right),
               ],
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.notifications_active_outlined),
+            title: const Text('Post-workout notifications'),
+            subtitle: const Text(
+              'Get a push after new Strava activities (requires configured build)',
+            ),
+            onTap: () async {
+              // In public builds this is typically not configured; keep UX premium and keep
+              // developer diagnostics in debug only.
+              if (!NotificationApiService.isConfigured) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Post-workout notifications aren’t available in this build.'),
+                    ),
+                  );
+                }
+                return;
+              }
+
+              final result = await FcmService().retryDeviceRegistration();
+              if (!context.mounted) return;
+              if (result == true) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Notifications enabled on this device.')),
+                );
+              } else if (result == false) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Couldn’t enable notifications. Please try again.')),
+                );
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Post-workout notifications aren’t available in this build.'),
+                  ),
+                );
+              }
+            },
           ),
           const Divider(height: 32),
           Padding(
