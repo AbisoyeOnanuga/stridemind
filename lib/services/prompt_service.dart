@@ -191,8 +191,9 @@ Now, generate the feedback as a single, valid JSON object based on the context a
           "Average Cadence: ${(activity.averageCadence! * 2).toStringAsFixed(0)} spm");
     }
 
-    if (isRun && activity.splits != null && activity.splits!.isNotEmpty) {
-      final kmSplits = activity.splits!
+    final canonical = activity.canonicalSegments;
+    if (isRun && canonical.isNotEmpty) {
+      final kmSplits = canonical
           .where((s) => (s.distance - 1000.0).abs() < 5.0)
           .toList();
       if (kmSplits.isNotEmpty) {

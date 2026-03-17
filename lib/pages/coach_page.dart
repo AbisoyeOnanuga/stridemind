@@ -952,18 +952,18 @@ class _CoachPageState extends State<CoachPage> {
             padding: const EdgeInsets.only(left: 56, top: 4, bottom: 8),
             child: Text(details.join('  •  ')),
           ),
-        if (activity.splits != null && activity.splits!.isNotEmpty)
-          _buildSplitsTable(activity.splits!),
+        if (activity.canonicalSegments.isNotEmpty)
+          _buildSplitsTable(activity.canonicalSegments),
       ],
     );
   }
 
   Widget _buildSplitsTable(List<strava_models.Split> splits) {
-    // Filter for metric splits (which are per km)
     final kmSplits =
         splits.where((s) => (s.distance - 1000.0).abs() < 5.0).toList();
-
-    if (kmSplits.isEmpty) return const SizedBox.shrink();
+    final isKmView = kmSplits.isNotEmpty;
+    final rows = isKmView ? kmSplits : splits.take(20).toList();
+    if (rows.isEmpty) return const SizedBox.shrink();
 
     return Padding(
       padding: const EdgeInsets.only(left: 40.0, right: 16, top: 0, bottom: 8),
@@ -973,18 +973,31 @@ class _CoachPageState extends State<CoachPage> {
         headingRowHeight: 24,
         dataRowMinHeight: 24,
         dataRowMaxHeight: 32,
-        columns: const [
-          DataColumn(label: Text('Split')),
-          DataColumn(label: Text('Pace/km'), numeric: true),
-          DataColumn(label: Text('Time'), numeric: true),
-        ],
-        rows: List.generate(kmSplits.length, (index) {
-          final split = kmSplits[index];
+        columns: isKmView
+            ? const [
+                DataColumn(label: Text('Km')),
+                DataColumn(label: Text('Pace/km'), numeric: true),
+                DataColumn(label: Text('Time'), numeric: true),
+              ]
+            : const [
+                DataColumn(label: Text('#')),
+                DataColumn(label: Text('Dist'), numeric: true),
+                DataColumn(label: Text('Pace'), numeric: true),
+                DataColumn(label: Text('Time'), numeric: true),
+              ],
+        rows: List.generate(rows.length, (index) {
+          final split = rows[index];
           return DataRow(
             cells: [
               DataCell(Text('${index + 1}')),
-              DataCell(Text(_formatPace(split.averageSpeed))),
-              DataCell(Text(_formatDuration(split.movingTime))),
+              if (isKmView) ...[
+                DataCell(Text(_formatPace(split.averageSpeed))),
+                DataCell(Text(_formatDuration(split.movingTime))),
+              ] else ...[
+                DataCell(Text(_formatDistance(split.distance))),
+                DataCell(Text(_formatPace(split.averageSpeed))),
+                DataCell(Text(_formatDuration(split.movingTime))),
+              ],
             ],
           );
         }),

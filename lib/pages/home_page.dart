@@ -440,7 +440,7 @@ class _ActivityDashboardState extends State<ActivityDashboard>
         for (var i = 0; i < _activities.length && i < maxPrefetch; i++) {
           final a = _activities[i];
           if (a.source != null && a.source != 'strava') continue;
-          if (a.splits != null && a.splits!.isNotEmpty) continue;
+          if (a.canonicalSegments.isNotEmpty) continue;
           try {
             final full = await api.getActivityDetails(a.id);
             await _db.upsertActivities([full]);

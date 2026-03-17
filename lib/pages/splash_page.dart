@@ -23,6 +23,7 @@ class SplashPage extends StatefulWidget {
 
 class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateMixin {
   static const Duration _splashDuration = Duration(milliseconds: 2400);
+  bool _didStartLoginCheck = false;
   late AnimationController _controller;
   late Animation<double> _fadeScale;
 
@@ -51,10 +52,16 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
 
   Future<void> _checkLoginStatus() async {
     if (!mounted) return;
+    if (_didStartLoginCheck) return;
+    _didStartLoginCheck = true;
 
     // 1) Firebase user present (when Firebase is enabled) -> Home or onboarding
     if (widget.firebaseAuthService.currentUser != null) {
-      await widget.fcmService.initialize(stravaAuthService: widget.authService);
+      await widget.fcmService
+          .initialize(stravaAuthService: widget.authService)
+          .timeout(const Duration(seconds: 6), onTimeout: () {
+        debugPrint('SplashPage: FCM init timed out; continuing.');
+      });
       if (!mounted) return;
       final runnerProfile = await DatabaseService().getRunnerProfile();
       if (!mounted) return;
@@ -87,7 +94,11 @@ class _SplashPageState extends State<SplashPage> with SingleTickerProviderStateM
     if (accessToken != null) {
       final firebaseUser = await widget.firebaseAuthService.signInAnonymously();
       if (mounted) {
-        await widget.fcmService.initialize(stravaAuthService: widget.authService);
+        await widget.fcmService
+            .initialize(stravaAuthService: widget.authService)
+            .timeout(const Duration(seconds: 6), onTimeout: () {
+          debugPrint('SplashPage: FCM init timed out; continuing.');
+        });
       }
       final stravaApiService = StravaApiService(accessToken: accessToken);
       try {

@@ -25,6 +25,7 @@ class ActivityDetailPage extends StatefulWidget {
 class _ActivityDetailPageState extends State<ActivityDetailPage> {
   late StravaActivity _activity;
   String? _loadError;
+  bool _attemptedFullDetailsFetch = false;
 
   @override
   void initState() {
@@ -36,10 +37,16 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
   /// Fetches full activity (splits, etc.) when the summary has no splits.
   /// Saves to cache so next open is instant. No loading spinner.
   Future<void> _loadFullDetailsIfNeeded() async {
-    final hasSplits = _activity.splits != null && _activity.splits!.isNotEmpty;
-    if (hasSplits) return;
+    if (_attemptedFullDetailsFetch) return;
+
+    // Backfill once if we don't yet have Strava laps/intervals, even if we have old cached splits.
+    final needsLapsBackfill =
+        _activity.type.toLowerCase() == 'run' && (_activity.laps == null || _activity.laps!.isEmpty);
+
+    if (!needsLapsBackfill && _activity.canonicalSegments.isNotEmpty) return;
 
     setState(() => _loadError = null);
+    _attemptedFullDetailsFetch = true;
 
     try {
       final token = await widget.authService.getValidAccessToken();
@@ -78,6 +85,8 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
   @override
   Widget build(BuildContext context) {
     final isRun = _activity.type.toLowerCase() == 'run';
+    final hasLaps = _activity.laps != null && _activity.laps!.isNotEmpty;
+    final segments = _activity.canonicalSegments;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -158,10 +167,10 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
             ]),
           ],
           // Splits for runs (per km); equivalent "Splits / laps" for other types (no loading spinner; data appears when ready)
-          if (_loadError != null && (_activity.splits == null || _activity.splits!.isEmpty)) ...[
+          if (_loadError != null && segments.isEmpty) ...[
             const SizedBox(height: 16),
             _Section(
-              title: isRun ? 'Splits (per km)' : 'Splits / laps',
+              title: hasLaps ? 'Laps / intervals' : (isRun ? 'Splits (per km)' : 'Splits / laps'),
               children: [
                 Text(
                   'Could not load split data.',
@@ -169,14 +178,14 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
                 ),
               ],
             ),
-          ] else if (_activity.splits != null && _activity.splits!.isNotEmpty) ...[
+          ] else if (segments.isNotEmpty) ...[
             const SizedBox(height: 16),
             _Section(
-              title: isRun ? 'Splits (per km)' : 'Splits / laps',
+              title: hasLaps ? 'Laps / intervals' : (isRun ? 'Splits (per km)' : 'Splits / laps'),
               children: [
-                _SplitsTable(splits: _activity.splits!),
+                _SplitsTable(splits: segments),
                 const SizedBox(height: 12),
-                _SplitStatsChips(splits: _activity.splits!),
+                _SplitStatsChips(splits: segments),
               ],
             ),
           ],
@@ -272,7 +281,7 @@ class _SplitsTable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final kmSplits = ActivityDisplayUtils.getKmSplits(splits);
-    if (kmSplits.isEmpty) return const SizedBox.shrink();
+    final isKmView = kmSplits.isNotEmpty;
 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -299,6 +308,7 @@ class _SplitsTable extends StatelessWidget {
           0: FlexColumnWidth(0.8),
           1: FlexColumnWidth(1.2),
           2: FlexColumnWidth(1.0),
+          3: FlexColumnWidth(1.0),
         },
         border: TableBorder.symmetric(
           inside: BorderSide(color: borderColor.withValues(alpha: 0.5)),
@@ -310,11 +320,15 @@ class _SplitsTable extends StatelessWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Text('Km', style: headerStyle),
+                child: Text(isKmView ? 'Km' : '#', style: headerStyle),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Text('Pace', style: headerStyle),
+                child: Text(isKmView ? 'Pace' : 'Distance', style: headerStyle),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Text(isKmView ? 'Time' : 'Pace', style: headerStyle),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -322,7 +336,7 @@ class _SplitsTable extends StatelessWidget {
               ),
             ],
           ),
-          ...kmSplits.asMap().entries.map((e) {
+          ...(isKmView ? kmSplits : splits).asMap().entries.map((e) {
             final i = e.key + 1;
             final s = e.value;
             return TableRow(
@@ -333,7 +347,21 @@ class _SplitsTable extends StatelessWidget {
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Text(ActivityDisplayUtils.formatPace(s.averageSpeed), style: cellStyle),
+                  child: Text(
+                    isKmView
+                        ? ActivityDisplayUtils.formatPace(s.averageSpeed)
+                        : ActivityDisplayUtils.formatDistance(s.distance),
+                    style: cellStyle,
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Text(
+                    isKmView
+                        ? ActivityDisplayUtils.formatDuration(s.movingTime)
+                        : ActivityDisplayUtils.formatPace(s.averageSpeed),
+                    style: cellStyle,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
