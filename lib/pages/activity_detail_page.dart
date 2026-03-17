@@ -98,11 +98,11 @@ class _ActivityDetailPageState extends State<ActivityDetailPage> {
       appBar: AppBar(
         title: const Text('Activity details'),
         actions: [
-          TextButton.icon(
+          IconButton(
+            tooltip: 'Discuss with coach',
             onPressed: () => Navigator.of(context).pop(_activity),
-            icon: const Icon(Icons.chat_bubble_outline, size: 20),
-            label: const Text('Discuss with coach'),
-          ),
+            icon: const Icon(Icons.chat_bubble_outline),
+          )
         ],
       ),
       body: ListView(
@@ -446,7 +446,7 @@ class _KmSplitsTable extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Text('Pace', style: headerStyle),
+                child: Text('Pace (/km)', style: headerStyle),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -534,7 +534,7 @@ class _IntervalsTable extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                child: Text('Pace', style: headerStyle),
+                child: Text('Pace (/km)', style: headerStyle),
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),

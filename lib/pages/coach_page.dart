@@ -577,6 +577,8 @@ class _CoachPageState extends State<CoachPage> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Always allow picking a context workout (today or recent).
+            _buildRecentActivityPicker(),
             if (activities.isEmpty) ...[
               const ListTile(
                 leading: Icon(Icons.info_outline),
@@ -585,7 +587,6 @@ class _CoachPageState extends State<CoachPage> {
                     'Select a recent workout below to discuss with the coach.'),
                 contentPadding: EdgeInsets.zero,
               ),
-              _buildRecentActivityPicker(),
             ],
             ...activities.map((activity) {
               if (activity.type.toLowerCase() == 'run' &&

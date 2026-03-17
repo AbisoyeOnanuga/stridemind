@@ -115,6 +115,9 @@ class ActivityDisplayUtils {
 
     final avgSpeed =
         kmSplits.map((s) => s.averageSpeed).reduce((a, b) => a + b) / kmSplits.length;
+    final firstSplit = kmSplits.first;
+    final lastSplit = kmSplits.last;
+
     final mid = kmSplits.length ~/ 2;
     final firstHalf = kmSplits.sublist(0, mid.clamp(1, kmSplits.length));
     final secondHalf = kmSplits.sublist(mid.clamp(0, kmSplits.length));
@@ -142,8 +145,8 @@ class ActivityDisplayUtils {
 
     return [
       (label: 'Avg pace', value: '${formatPace(avgSpeed)}/km'),
-      (label: 'First ${firstHalf.length} km', value: formatPace(firstAvg)),
-      (label: 'Last ${secondHalf.length} km', value: formatPace(secondAvg)),
+      (label: 'First km split', value: formatPace(firstSplit.averageSpeed)),
+      (label: 'Last km split', value: formatPace(lastSplit.averageSpeed)),
       (label: 'Fastest km', value: '#$fastestIdx ${formatPace(fastest.averageSpeed)}'),
       (label: 'Slowest km', value: '#$slowestIdx ${formatPace(slowest.averageSpeed)}'),
       (label: 'Trend', value: trend),
