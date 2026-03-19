@@ -15,6 +15,8 @@ class FcmService {
 
   final NotificationApiService _notificationApiService = NotificationApiService();
   StravaAuthService? _stravaAuthService;
+  static bool _messageListenersAttached = false;
+  static bool _tokenRefreshListenerAttached = false;
 
   FirebaseMessaging? get _firebaseMessaging {
     if (!FirebaseRuntime.isEnabled) return null;
@@ -52,30 +54,36 @@ class FcmService {
 
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-    // Handle messages while the app is in the foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('Got a message whilst in the foreground!');
-      debugPrint('Message data: ${message.data}');
-      _handleActivityIdData(message.data);
+    if (!_messageListenersAttached) {
+      _messageListenersAttached = true;
+      // Handle messages while the app is in the foreground
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('Got a message whilst in the foreground!');
+        debugPrint('Message data: ${message.data}');
+        _handleActivityIdData(message.data);
 
-      if (message.notification != null) {
-        debugPrint('Message also contained a notification: ${message.notification}');
-      }
-    });
+        if (message.notification != null) {
+          debugPrint('Message also contained a notification: ${message.notification}');
+        }
+      });
 
-    // When user opens app from a notification (or from background), refresh list
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('Message opened app: ${message.data}');
-      _handleActivityIdData(message.data);
-    });
+      // When user opens app from a notification (or from background), refresh list
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        debugPrint('Message opened app: ${message.data}');
+        _handleActivityIdData(message.data);
+      });
+    }
 
     // Get the token and save it to Firestore
     await _saveToken();
 
-    // Listen for token refreshes and save the new one
-    firebaseMessaging.onTokenRefresh.listen((token) {
-      _notificationApiService.registerDevice(token);
-    });
+    if (!_tokenRefreshListenerAttached) {
+      _tokenRefreshListenerAttached = true;
+      // Listen for token refreshes and save the new one
+      firebaseMessaging.onTokenRefresh.listen((token) {
+        _notificationApiService.registerDevice(token);
+      });
+    }
   }
 
   /// If [data] contains activityId, fetch activity from Strava, upsert to DB, notify dashboard.
