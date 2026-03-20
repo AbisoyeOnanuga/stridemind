@@ -25,6 +25,7 @@ Use clear, intent-first messages. Preferred prefixes:
 - `flutter test` passes.
 - Changelog updated for user-visible changes.
 - If architecture changes, add/update ADR in `docs/adr/`.
+- Check `docs/ENGINEERING_BACKLOG.md` for active guardrails and planned reliability work.
 
 ## AI/Agentic coding guardrails
 
