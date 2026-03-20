@@ -1,4 +1,5 @@
-# Runs on PRs and pushes to main. Analyze only; tests run when test/ exists.
+# Runs on PRs and pushes to main.
+# This template always runs analyze. Tests run only when *_test.dart files exist.
 name: Flutter CI
 
 on:
@@ -32,11 +33,11 @@ jobs:
       - name: Flutter analyze
         run: flutter analyze
 
-      - name: Flutter test
+      - name: Run Flutter tests (if present)
         if: ${{ hashFiles('test/**/*_test.dart') != '' }}
         run: flutter test
 
-      - name: No tests found
+      - name: Skip tests (template has no test files yet)
         if: ${{ hashFiles('test/**/*_test.dart') == '' }}
-        run: echo "No test directory or *_test.dart files found; skipping."
+        run: echo "::notice::No *_test.dart files found. This is expected until tests are added."
 
