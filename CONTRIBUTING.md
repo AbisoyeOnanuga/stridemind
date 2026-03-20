@@ -33,3 +33,11 @@ Use clear, intent-first messages. Preferred prefixes:
 - Include test evidence (commands + results).
 - Prefer incremental, reviewable changes over large rewrites.
 
+## CI worker failures (GitHub-hosted runners)
+
+Occasional "worker" failures are infrastructure noise, not code regressions. Best-practice triage:
+
+1. Re-run failed jobs once.
+2. If the same step fails again, treat as code/config and fix before merge.
+3. In public template issues, include the workflow run URL, failing job name, and exact failing step so maintainers can reproduce quickly.
+

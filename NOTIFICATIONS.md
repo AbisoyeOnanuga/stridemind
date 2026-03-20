@@ -1,6 +1,6 @@
-﻿# Post-workout notifications
+# Post-workout notifications
 
-Push after you record or upload an activity on Strava: *"Great workout, &lt;name&gt;! Tell the AI coach how it went..."*
+Push after you record or upload an activity on Strava: *"Great workout, &lt;name&gt;! Tell the AI coach how it felt and get your next-session guidance."*
 
 **Flow:** Strava → webhook to **your backend** → backend finds the user’s FCM token in Firestore → backend sends FCM to the app.
 
@@ -21,7 +21,7 @@ To support this feature, your backend must:
 
 1. **Webhook endpoint** (GET + POST)  
    - **GET:** Strava subscription verification. Query params: `hub.mode`, `hub.verify_token`, `hub.challenge`. If `hub.verify_token` matches your configured token, respond with `{ "hub.challenge": "<hub.challenge>" }`.  
-   - **POST:** Strava sends activity events (JSON body with `owner_id`, `object_id`, `object_type`, etc.). Look up Firebase UID by Strava athlete ID (e.g. Firestore `users` where `stravaProfile.id == owner_id`). Load FCM tokens from `users/{uid}/device_tokens`, then send a data message (e.g. FCM Admin SDK) with `activityId` and optional title/body.
+   - **POST:** Strava sends activity events (JSON body with `owner_id`, `object_id`, `object_type`, etc.). Look up Firebase UID by Strava athlete ID (e.g. Firestore `users` where `stravaProfile.id == owner_id`). Claim the event idempotently per `(uid, activityId)` before sending to avoid duplicate pushes from duplicate webhook deliveries. Load FCM tokens from `users/{uid}/device_tokens`, dedupe token IDs, then send a data message (e.g. FCM Admin SDK) with `activityId` and optional title/body.
 
 2. **Register-device endpoint** (POST)  
    - Accept `Authorization: Bearer <Firebase ID token>` and JSON body `{ "token": "<FCM token>", "strava_athlete_id": <number> }`.  
@@ -99,7 +99,7 @@ Strava has no “Subscribe” button in the dashboard; create the subscription v
 ## 4. Test
 
 1. Create a new activity in Strava (record or manual).
-2. You should get a push: *"Great workout, &lt;firstname&gt;! Tell the AI coach how it went..."*
+2. You should get a push: *"Great workout, &lt;firstname&gt;! Tell the AI coach how it felt and get your next-session guidance."*
 3. Tap the notification to open the app.
 
 ---
@@ -111,6 +111,7 @@ Strava has no “Subscribe” button in the dashboard; create the subscription v
 | Log | Meaning |
 |-----|--------|
 | "Received Strava webhook event" | Webhook called. If missing, check subscription and callback URL. |
+| "Duplicate activity event; notification already sent" | Expected when Strava retries the same event. Notification is correctly suppressed. |
 | "No user found for Strava ID …" | Strava profile not in Firestore. Connect Strava in app, then **Settings → Post-workout notifications**. |
 | "No device tokens found for user: …" | No FCM token for that user. **Settings → Post-workout notifications**; be signed in as the account with Strava connected. |
 | "FCM post-workout notification sent" | Push sent; check device notification settings. |
@@ -130,6 +131,7 @@ Strava has no “Subscribe” button in the dashboard; create the subscription v
 - [ ] App: `ENABLE_FIREBASE=true`, `STRAVA_WEBHOOK_BASE_URL` in dart-defines (gitignored).
 - [ ] Firebase: Android package name and SHA-1 (and `google-services.json`) correct.
 - [ ] App: signed in, Strava connected, notifications allowed; Settings tile tapped.
+- [ ] Backend: webhook idempotency + token dedupe enabled (single notification per activity).
 - [ ] New Strava activity → push received.
 
 ---

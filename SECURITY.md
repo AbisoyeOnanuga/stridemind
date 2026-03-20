@@ -34,6 +34,7 @@ If you enable `STRAVA_WEBHOOK_BASE_URL`, the app will register device FCM tokens
 
 - Setup and backend contract live in `NOTIFICATIONS.md`.
 - Do not commit: Strava verify token, Firebase service account JSON, Strava client secret, or backend URLs.
+- Prevent duplicate pushes by enforcing webhook idempotency (`user + activityId`) and deduplicating FCM tokens before multicast sends.
 
 ## Strava OAuth
 

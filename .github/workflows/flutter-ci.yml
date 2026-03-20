@@ -6,9 +6,17 @@ on:
   push:
     branches: [ "main" ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: flutter-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,10 +33,10 @@ jobs:
         run: flutter analyze
 
       - name: Flutter test
-        run: |
-          if [ -d test ] && [ -n "$(find test -name '*.dart' -print -quit)" ]; then
-            flutter test
-          else
-            echo "No test directory or tests found; skipping."
-          fi
+        if: ${{ hashFiles('test/**/*_test.dart') != '' }}
+        run: flutter test
+
+      - name: No tests found
+        if: ${{ hashFiles('test/**/*_test.dart') == '' }}
+        run: echo "No test directory or *_test.dart files found; skipping."
 
